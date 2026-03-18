@@ -27,23 +27,27 @@ const { useState, useCallback, useEffect } = React;
 // ============================================================
 // КОНФИГУРАЦИЯ
 // ============================================================
-const SYNC_URL = "https://script.google.com/macros/s/AKfycbxlk4SfuWzMZSb4-0QRPeAKKLCzyt6arvD3KZHM3EwwkEVUOUNESLKPaYDhBaI83RX5/exec";
+// URL для синхронизации данных — data.json в GitHub репозитории
+const DATA_JSON_URL = "https://raw.githubusercontent.com/sam31118-eng/mizar-dashboard/main/data.json";
 
+// Правильное соответствие: название → ссылка на Google Doc
 const DOC_URLS = {
-  tasks: "https://docs.google.com/document/d/1_9auxub_BV5mno-VLY_TX7cKrCa1GcQW/edit",
-  risks: "https://docs.google.com/document/d/1mPhqaTU74PRHFMOWaDMZzjMH5ENwJwvb/edit",
-  status: "https://docs.google.com/document/d/1AnGi2jpZHtc8zUeFeO964G0FDl_lFTeG/edit",
-  team_short: "https://docs.google.com/document/d/1wh5BbJQQjcMKEz6Xtx08teVnk4niUGby/edit",
-  team_long: "https://docs.google.com/document/d/1dBl3C5VOBKntEKuB_jFaeIllW__07yj1/edit",
+  tasks:      "https://docs.google.com/document/d/1AnGi2jpZHtc8zUeFeO964G0FDl_lFTeG/edit",
+  risks:      "https://docs.google.com/document/d/1dBl3C5VOBKntEKuB_jFaeIllW__07yj1/edit",
+  status:     "https://docs.google.com/document/d/1wh5BbJQQjcMKEz6Xtx08teVnk4niUGby/edit",
+  team_short: "https://docs.google.com/document/d/1_9auxub_BV5mno-VLY_TX7cKrCa1GcQW/edit",
+  team_long:  "https://docs.google.com/document/d/1mPhqaTU74PRHFMOWaDMZzjMH5ENwJwvb/edit",
 };
 
 // ============================================================
 // FETCH (follows 302 redirects automatically)
 // ============================================================
-function syncFetch(url, timeout = 20000) {
+// Загрузка data.json из GitHub (с cache-busting)
+function fetchDataJson(timeout = 15000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
-  return fetch(url, { signal: controller.signal, redirect: 'follow' })
+  const url = DATA_JSON_URL + "?t=" + Date.now();
+  return fetch(url, { signal: controller.signal })
     .then(res => { clearTimeout(timer); if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
     .catch(err => { clearTimeout(timer); throw err; });
 }
@@ -134,37 +138,17 @@ const S = {
 // ============================================================
 // SYNC BUTTON COMPONENT
 // ============================================================
-function SyncBtn({ section, onResult }) {
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState(null);
-
-  const go = async () => {
-    setLoading(true); setMsg(null);
-    try {
-      const url = section ? `${SYNC_URL}?section=${section}` : SYNC_URL;
-      const data = await syncFetch(url);
-      const size = data.char_count || JSON.stringify(data).length;
-      setMsg({ ok:true, text:`✅ ${size} символов (${new Date().toLocaleTimeString("ru-RU")})` });
-      if (onResult) onResult(section, data);
-    } catch (e) {
-      setMsg({ ok:false, text:`❌ ${e.message}` });
-    }
-    setLoading(false);
-    setTimeout(() => setMsg(null), 8000);
-  };
-
+function SyncBtn({ section, onSync }) {
   return (
     <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:10, flexWrap:"wrap" }}>
-      <button onClick={go} disabled={loading} style={{ ...S.btn, opacity:loading?0.6:1, cursor:loading?"wait":"pointer" }}>
-        <span style={{ display:"inline-block", animation:loading?"spin 1s linear infinite":"none" }}>⟳</span>
-        {loading ? " Загрузка..." : " Синхронизировать"}
+      <button onClick={onSync} style={S.btn}>
+        ⟳ Синхронизировать
       </button>
       {DOC_URLS[section] && (
         <a href={DOC_URLS[section]} target="_blank" rel="noopener noreferrer" style={{ ...S.btn, textDecoration:"none", fontSize:10 }}>
           📄 Google Doc
         </a>
       )}
-      {msg && <span style={{ fontSize:11, color:msg.ok?"#22c55e":"#ef4444" }}>{msg.text}</span>}
     </div>
   );
 }
@@ -175,33 +159,43 @@ function SyncBtn({ section, onResult }) {
 function App() {
   const [data, setData] = useState(INIT);
   const [tab, setTab] = useState("overview");
-  const [syncAllState, setSyncAllState] = useState(null);
+  const [syncing, setSyncing] = useState(false);
   const [globalMsg, setGlobalMsg] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
+  const [lastSync, setLastSync] = useState(null);
+  const [dataSource, setDataSource] = useState("INIT");
 
-  const handleSyncResult = useCallback((section, syncData) => {
-    setData(prev => ({
-      ...prev,
-      syncLog: [...(prev.syncLog || []), { section, time: new Date().toISOString(), chars: syncData.char_count || 0 }]
-    }));
+  // Загрузка data.json из GitHub
+  const loadFromGitHub = useCallback(async (silent) => {
+    if (!silent) setSyncing(true);
+    try {
+      const d = await fetchDataJson();
+      // Обновляем только непустые секции
+      setData(prev => ({
+        ...prev,
+        tasks: d.tasks && d.tasks.length ? d.tasks : prev.tasks,
+        risks: d.risks && d.risks.length ? d.risks : prev.risks,
+        status: d.status || prev.status,
+        contacts: d.contacts && d.contacts.length ? d.contacts : prev.contacts,
+        team: d.team && d.team.length ? d.team : prev.team,
+        docs: d.docs && d.docs.length ? d.docs : prev.docs,
+        syncLog: [...(prev.syncLog || []), { section:"all", time:new Date().toISOString(), chars:JSON.stringify(d).length }]
+      }));
+      setLastSync(new Date());
+      setDataSource(d.exported_at ? `data.json | Экспорт: ${new Date(d.exported_at).toLocaleDateString("ru-RU")}` : "data.json");
+      if (!silent) setGlobalMsg(`✅ Данные загружены | ${new Date().toLocaleTimeString("ru-RU")}`);
+    } catch(e) {
+      if (!silent) setGlobalMsg(`❌ Ошибка загрузки: ${e.message}`);
+    }
+    if (!silent) {
+      setSyncing(false);
+      setTimeout(() => setGlobalMsg(null), 6000);
+    }
   }, []);
 
-  const syncAll = async () => {
-    setSyncAllState("loading"); setGlobalMsg(null);
-    try {
-      const d = await syncFetch(SYNC_URL);
-      setSyncAllState("done");
-      const size = JSON.stringify(d).length;
-      setGlobalMsg(`✅ Все секции: ${size} байт | ${new Date().toLocaleTimeString("ru-RU")}`);
-      handleSyncResult("all", d);
-    } catch(e) {
-      setSyncAllState("error");
-      setGlobalMsg(`❌ ${e.message}`);
-    }
-    setTimeout(() => { setSyncAllState(null); }, 3000);
-    setTimeout(() => setGlobalMsg(null), 8000);
-  };
+  // Автозагрузка при открытии страницы
+  useEffect(() => { loadFromGitHub(true); }, [loadFromGitHub]);
 
   const toggleTask = (id) => setData(p => ({ ...p, tasks: p.tasks.map(t => t.id === id ? { ...t, status: t.status==="done"?"pending":t.status==="pending"?"in_progress":"done" } : t) }));
 
@@ -254,10 +248,16 @@ function App() {
         </div>
         <div style={{ display:"flex", gap:4, flexWrap:"wrap", alignItems:"center" }}>
           {tabs.map(t => <button key={t.id} style={S.tab(tab === t.id)} onClick={() => setTab(t.id)} onMouseOver={e => e.target.style.color = "#e2e8f0"} onMouseOut={e => { if (tab !== t.id) e.target.style.color = "#4a5568"; }}>{t.l}</button>)}
-          <button onClick={syncAll} style={{ ...S.btn, marginLeft:8 }}>
-            <span style={{ display:"inline-block", animation:syncAllState==="loading"?"spin 1s linear infinite":"none" }}>⟳</span> ВСЁ
+          <button onClick={() => loadFromGitHub(false)} disabled={syncing} style={{ ...S.btn, marginLeft:8, opacity:syncing?0.6:1 }}>
+            <span style={{ display:"inline-block", animation:syncing?"spin 1s linear infinite":"none" }}>⟳</span> ВСЁ
           </button>
         </div>
+      </div>
+
+      {/* STATUS BAR */}
+      <div style={{ padding:"4px 20px", fontSize:10, color:"#4a5568", display:"flex", justifyContent:"space-between", borderBottom:"1px solid rgba(255,255,255,0.03)" }}>
+        <span>Источник: {dataSource}</span>
+        {lastSync && <span style={{ color:"#22c55e" }}>● Синхр: {lastSync.toLocaleTimeString("ru-RU")}</span>}
       </div>
 
       {/* GLOBAL MSG */}
@@ -302,7 +302,7 @@ function App() {
                     <p style={{ margin:"4px 0 0", fontSize:11, color:"#7a8599" }}>{r.text}</p>
                   </div>
                 ))}
-                <SyncBtn section="risks" onResult={handleSyncResult} />
+                <SyncBtn section="risks" onSync={() => loadFromGitHub(false)} />
               </div>
 
               <div style={S.card}>
@@ -316,7 +316,7 @@ function App() {
                     <span style={{ fontSize:11 }}>{c.status}</span>
                   </div>
                 ))}
-                <SyncBtn section="status" onResult={handleSyncResult} />
+                <SyncBtn section="status" onSync={() => loadFromGitHub(false)} />
               </div>
             </div>
 
@@ -342,7 +342,7 @@ function App() {
                   {t.deadline && <span style={{ fontSize:10, color:deadlineColor(t.deadline), fontWeight:600 }}>{daysTo(t.deadline)}д</span>}
                 </div>
               ))}
-              <SyncBtn section="tasks" onResult={handleSyncResult} />
+              <SyncBtn section="tasks" onSync={() => loadFromGitHub(false)} />
             </div>
           </div>
         )}
@@ -364,7 +364,7 @@ function App() {
                 {t.deadline && <span style={{ fontSize:10, color:deadlineColor(t.deadline), fontWeight:600 }}>{daysTo(t.deadline)}д</span>}
               </div>
             ))}
-            <SyncBtn section="tasks" onResult={handleSyncResult} />
+            <SyncBtn section="tasks" onSync={() => loadFromGitHub(false)} />
           </div>
         )}
 
@@ -399,7 +399,7 @@ function App() {
                 ))}
               </tbody>
             </table>
-            <SyncBtn section="status" onResult={handleSyncResult} />
+            <SyncBtn section="status" onSync={() => loadFromGitHub(false)} />
           </div>
         )}
 
@@ -430,7 +430,7 @@ function App() {
                 </tbody>
               </table>
             </div>
-            <SyncBtn section="team_short" onResult={handleSyncResult} />
+            <SyncBtn section="team_short" onSync={() => loadFromGitHub(false)} />
           </div>
         )}
 
@@ -505,7 +505,7 @@ function App() {
 
       {/* FOOTER */}
       <div style={{ padding:"12px 20px", borderTop:"1px solid rgba(56,189,248,0.06)", textAlign:"center", color:"#2d3748", fontSize:10, marginTop:30 }}>
-        МИЦАР Dashboard v2.3 fetch | Прикус Вселенной | Код: ЛЮБОВЬ |{" "}
+        МИЦАР Dashboard v3.0 | data.json → GitHub | Прикус Вселенной | Код: ЛЮБОВЬ |{" "}
         <a href="https://biteoftheuniverse.com" target="_blank" rel="noopener noreferrer" style={{ color:"#38bdf8", textDecoration:"none" }}>biteoftheuniverse.com</a>
       </div>
     </div>
