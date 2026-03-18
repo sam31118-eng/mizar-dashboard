@@ -38,21 +38,14 @@ const DOC_URLS = {
 };
 
 // ============================================================
-// JSONP FETCH
+// FETCH (follows 302 redirects automatically)
 // ============================================================
-function jsonpFetch(url, timeout = 20000) {
-  return new Promise((resolve, reject) => {
-    const cb = 'mizar_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    const timer = setTimeout(() => { cleanup(); reject(new Error('Таймаут 20сек')); }, timeout);
-    const script = document.createElement('script');
-
-    function cleanup() { clearTimeout(timer); delete window[cb]; if (script.parentNode) script.remove(); }
-
-    window[cb] = (data) => { cleanup(); resolve(data); };
-    script.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cb;
-    script.onerror = () => { cleanup(); reject(new Error('Ошибка загрузки скрипта')); };
-    document.head.appendChild(script);
-  });
+function syncFetch(url, timeout = 20000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  return fetch(url, { signal: controller.signal, redirect: 'follow' })
+    .then(res => { clearTimeout(timer); if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+    .catch(err => { clearTimeout(timer); throw err; });
 }
 
 // ============================================================
@@ -149,7 +142,7 @@ function SyncBtn({ section, onResult }) {
     setLoading(true); setMsg(null);
     try {
       const url = section ? `${SYNC_URL}?section=${section}` : SYNC_URL;
-      const data = await jsonpFetch(url);
+      const data = await syncFetch(url);
       const size = data.char_count || JSON.stringify(data).length;
       setMsg({ ok:true, text:`✅ ${size} символов (${new Date().toLocaleTimeString("ru-RU")})` });
       if (onResult) onResult(section, data);
@@ -197,7 +190,7 @@ function App() {
   const syncAll = async () => {
     setSyncAllState("loading"); setGlobalMsg(null);
     try {
-      const d = await jsonpFetch(SYNC_URL);
+      const d = await syncFetch(SYNC_URL);
       setSyncAllState("done");
       const size = JSON.stringify(d).length;
       setGlobalMsg(`✅ Все секции: ${size} байт | ${new Date().toLocaleTimeString("ru-RU")}`);
@@ -512,7 +505,7 @@ function App() {
 
       {/* FOOTER */}
       <div style={{ padding:"12px 20px", borderTop:"1px solid rgba(56,189,248,0.06)", textAlign:"center", color:"#2d3748", fontSize:10, marginTop:30 }}>
-        МИЦАР Dashboard v2.2 | Прикус Вселенной | Код: ЛЮБОВЬ |{" "}
+        МИЦАР Dashboard v2.3 fetch | Прикус Вселенной | Код: ЛЮБОВЬ |{" "}
         <a href="https://biteoftheuniverse.com" target="_blank" rel="noopener noreferrer" style={{ color:"#38bdf8", textDecoration:"none" }}>biteoftheuniverse.com</a>
       </div>
     </div>
