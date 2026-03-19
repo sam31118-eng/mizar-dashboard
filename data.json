@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-03-19T15:51:40.994Z",
+  "exported_at": "2026-03-19T15:53:00.338Z",
   "project": "Прикус Вселенной",
   "tasks": [
     {
@@ -29,14 +29,6 @@
     },
     {
       "id": "T004",
-      "title": "Привет",
-      "priority": "high",
-      "status": "pending",
-      "assignee": "Капитан",
-      "section": "рутина"
-    },
-    {
-      "id": "T005",
       "title": "Проверить баланс Сбер (дебетовая карта)",
       "priority": "high",
       "status": "pending",
@@ -44,7 +36,7 @@
       "section": "рутина"
     },
     {
-      "id": "T006",
+      "id": "T005",
       "title": "АНО «Автор»: сайт avtor-russia.ru + Telegram @programmaavtor + VK",
       "priority": "high",
       "status": "pending",
@@ -52,7 +44,7 @@
       "section": "рутина"
     },
     {
-      "id": "T007",
+      "id": "T006",
       "title": "Gmail: проверить ответы от контактов",
       "priority": "high",
       "status": "pending",
@@ -60,7 +52,7 @@
       "section": "рутина"
     },
     {
-      "id": "T008",
+      "id": "T007",
       "title": "Обновить дату и время в файле !!!!_05_ТЕКУЩИЙ СТАТУС",
       "priority": "high",
       "status": "pending",
@@ -68,7 +60,23 @@
       "section": "рутина"
     },
     {
+      "id": "T008",
+      "title": "Продать квартиру",
+      "priority": "high",
+      "status": "pending",
+      "assignee": "Капитан",
+      "section": "творческий"
+    },
+    {
       "id": "T009",
+      "title": "Переехать в Москву",
+      "priority": "high",
+      "status": "pending",
+      "assignee": "Капитан",
+      "section": "творческий"
+    },
+    {
+      "id": "T010",
       "title": "Док.16 — оформить сцену 7 мин из надиктовки 13.03 в сценарный формат",
       "priority": "high",
       "status": "pending",
@@ -77,7 +85,7 @@
       "deadline": "2026-03-13"
     },
     {
-      "id": "T010",
+      "id": "T011",
       "title": "Каждому члену команды — составить библию своего персонажа + найти прототипа [Нерей , Рихтер , остальные ]",
       "priority": "high",
       "status": "done",
@@ -85,7 +93,7 @@
       "section": "творческий"
     },
     {
-      "id": "T011",
+      "id": "T012",
       "title": "Подготовить промпты Genspark для видеоролика [после Док.16]",
       "priority": "high",
       "status": "pending",
@@ -363,6 +371,12 @@
     }
   ],
   "syncLog": [
+    {
+      "time": "19.03.2026, 18:53:00",
+      "source": "AutoSync v4.3",
+      "tasks": 12,
+      "captain": 10
+    },
     {
       "time": "19.03.2026, 18:51:40",
       "source": "AutoSync v4.3",
