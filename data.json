@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-03-19T15:40:09.496Z",
+  "exported_at": "2026-03-19T15:47:45.268Z",
   "project": "Прикус Вселенной",
   "tasks": [
     {
@@ -29,7 +29,7 @@
     },
     {
       "id": "T004",
-      "title": "Проверить баланс Сбер (дебетовая карта)",
+      "title": "Привет",
       "priority": "high",
       "status": "pending",
       "assignee": "Капитан",
@@ -37,7 +37,7 @@
     },
     {
       "id": "T005",
-      "title": "АНО «Автор»: сайт avtor-russia.ru + Telegram @programmaavtor + VK",
+      "title": "Проверить баланс Сбер (дебетовая карта)",
       "priority": "high",
       "status": "pending",
       "assignee": "Капитан",
@@ -45,7 +45,7 @@
     },
     {
       "id": "T006",
-      "title": "Gmail: проверить ответы от контактов",
+      "title": "АНО «Автор»: сайт avtor-russia.ru + Telegram @programmaavtor + VK",
       "priority": "high",
       "status": "pending",
       "assignee": "Капитан",
@@ -53,7 +53,7 @@
     },
     {
       "id": "T007",
-      "title": "Обновить дату и время в файле !!!!_05_ТЕКУЩИЙ СТАТУС",
+      "title": "Gmail: проверить ответы от контактов",
       "priority": "high",
       "status": "pending",
       "assignee": "Капитан",
@@ -61,6 +61,14 @@
     },
     {
       "id": "T008",
+      "title": "Обновить дату и время в файле !!!!_05_ТЕКУЩИЙ СТАТУС",
+      "priority": "high",
+      "status": "pending",
+      "assignee": "Капитан",
+      "section": "рутина"
+    },
+    {
+      "id": "T009",
       "title": "Док.16 — оформить сцену 7 мин из надиктовки 13.03 в сценарный формат",
       "priority": "high",
       "status": "pending",
@@ -69,7 +77,7 @@
       "deadline": "2026-03-13"
     },
     {
-      "id": "T009",
+      "id": "T010",
       "title": "Каждому члену команды — составить библию своего персонажа + найти прототипа [Нерей , Рихтер , остальные ]",
       "priority": "high",
       "status": "done",
@@ -77,7 +85,7 @@
       "section": "творческий"
     },
     {
-      "id": "T010",
+      "id": "T011",
       "title": "Подготовить промпты Genspark для видеоролика [после Док.16]",
       "priority": "high",
       "status": "pending",
@@ -355,6 +363,12 @@
     }
   ],
   "syncLog": [
+    {
+      "time": "19.03.2026, 18:47:45",
+      "source": "AutoSync v4.3",
+      "tasks": 11,
+      "captain": 10
+    },
     {
       "time": "19.03.2026, 18:40:09",
       "source": "AutoSync v4.3",
