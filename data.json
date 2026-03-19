@@ -1,5 +1,5 @@
 {
-  "exported_at": "2026-03-19T17:43:22.008Z",
+  "exported_at": "2026-03-19T17:50:08.720Z",
   "project": "Прикус Вселенной",
   "tasks": [
     {
@@ -372,6 +372,12 @@
   ],
   "syncLog": [
     {
+      "time": "19.03.2026, 20:50:08",
+      "source": "AutoSync v4.3",
+      "tasks": 12,
+      "captain": 10
+    },
+    {
       "time": "19.03.2026, 20:43:22",
       "source": "AutoSync v4.1",
       "tasks": 12
@@ -476,12 +482,6 @@
     },
     {
       "time": "19.03.2026, 18:27:29",
-      "source": "AutoSync v4.2",
-      "tasks": 9,
-      "captain": 10
-    },
-    {
-      "time": "19.03.2026, 18:12:29",
       "source": "AutoSync v4.2",
       "tasks": 9,
       "captain": 10
