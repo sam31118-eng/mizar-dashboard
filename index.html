@@ -16,21 +16,32 @@ body{background:#080c1f;color:#e2e8f0;font-family:'JetBrains Mono','Courier New'
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 4px rgba(56,189,248,0.3),0 0 8px rgba(56,189,248,0.15)}50%{box-shadow:0 0 12px rgba(56,189,248,0.6),0 0 24px rgba(56,189,248,0.3)}}
+.delete-btn{opacity:0;transition:opacity 0.15s;background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px;font-family:inherit;flex-shrink:0}
+.delete-btn:hover{background:rgba(239,68,68,0.15)}
+.hoverable-row:hover .delete-btn{opacity:1}
+.form-input{width:100%;background:rgba(8,12,31,0.9);border:1px solid rgba(56,189,248,0.15);color:#e2e8f0;font-family:'JetBrains Mono','Courier New',monospace;font-size:11px;padding:7px 10px;border-radius:6px;outline:none;transition:border-color 0.2s}
+.form-input:focus{border-color:rgba(56,189,248,0.4)}
+.form-input::placeholder{color:#4a5568}
+.form-select{width:100%;background:rgba(8,12,31,0.9);border:1px solid rgba(56,189,248,0.15);color:#e2e8f0;font-family:'JetBrains Mono','Courier New',monospace;font-size:11px;padding:7px 10px;border-radius:6px;outline:none;-webkit-appearance:none;appearance:none;cursor:pointer}
+.form-select option{background:#0c1a3a;color:#e2e8f0}
+.form-label{display:block;font-size:10px;color:#64748b;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px}
+.save-btn-glow{animation:glowPulse 1.5s ease-in-out infinite}
+.inline-edit{background:transparent;border:none;border-bottom:1px dashed rgba(56,189,248,0.3);color:#e2e8f0;font-family:'JetBrains Mono','Courier New',monospace;font-size:12px;padding:1px 2px;outline:none;width:100%}
+.inline-edit:focus{border-bottom-color:#38bdf8}
 </style>
 </head>
 <body>
 <div id="root"></div>
 
 <script type="text/babel">
-const { useState, useCallback, useEffect } = React;
+const { useState, useCallback, useEffect, useRef } = React;
 
 // ============================================================
 // КОНФИГУРАЦИЯ
 // ============================================================
-// URL для синхронизации данных — data.json в GitHub репозитории
 const DATA_JSON_URL = "https://raw.githubusercontent.com/sam31118-eng/mizar-dashboard/main/data.json";
 
-// Правильное соответствие: название → ссылка на Google Doc
 const DOC_URLS = {
   tasks:      "https://docs.google.com/document/d/1AnGi2jpZHtc8zUeFeO964G0FDl_lFTeG/edit",
   risks:      "https://docs.google.com/document/d/1dBl3C5VOBKntEKuB_jFaeIllW__07yj1/edit",
@@ -40,9 +51,50 @@ const DOC_URLS = {
 };
 
 // ============================================================
-// FETCH (follows 302 redirects automatically)
+// GITHUB SAVE
 // ============================================================
-// Загрузка data.json из GitHub (с cache-busting)
+let _ghToken = null;
+function getGitHubToken() {
+  if (_ghToken) return _ghToken;
+  const t = prompt("Введите GitHub Token для сохранения:\n(ghp_... — из настроек GitHub)");
+  if (t && t.startsWith("ghp_")) { _ghToken = t; return t; }
+  return null;
+}
+
+async function saveToGitHub(data) {
+  const token = getGitHubToken();
+  if (!token) throw new Error("Токен не введён");
+  const owner = "sam31118-eng";
+  const repo = "mizar-dashboard";
+  const path = "data.json";
+  const branch = "main";
+
+  // 1. Get current file SHA
+  const getUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
+  const getRes = await fetch(getUrl, {
+    headers: { "Authorization": `token ${token}`, "Accept": "application/vnd.github.v3+json" }
+  });
+  const current = await getRes.json();
+  const sha = current.sha;
+
+  // 2. PUT updated content
+  const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+  const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+    method: "PUT",
+    headers: { "Authorization": `token ${token}`, "Accept": "application/vnd.github.v3+json", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message: `МИЦАР Dashboard: ${new Date().toLocaleString("ru-RU", {timeZone:"Europe/Moscow"})}`,
+      content,
+      sha,
+      branch
+    })
+  });
+  return putRes.ok;
+}
+
+// ============================================================
+// FETCH
+// ============================================================
 function fetchDataJson(timeout = 15000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
@@ -120,6 +172,12 @@ const PRIO = { critical:"🔴", high:"🟡", medium:"🔵", low:"🟢" };
 const daysTo = (d) => d ? Math.ceil((new Date(d) - new Date()) / 864e5) : null;
 const deadlineColor = (d) => { const n = daysTo(d); return !n ? "#64748b" : n <= 3 ? "#ef4444" : n <= 7 ? "#f59e0b" : "#22c55e"; };
 
+const nextId = (prefix, items) => {
+  const nums = items.map(i => parseInt(i.id.replace(prefix, ""), 10)).filter(n => !isNaN(n));
+  const max = nums.length ? Math.max(...nums) : 0;
+  return prefix + String(max + 1).padStart(3, "0");
+};
+
 const S = {
   page: { minHeight:"100vh", background:"linear-gradient(160deg,#080c1f 0%,#0c1a3a 40%,#0a1028 100%)", color:"#e2e8f0", fontFamily:"'JetBrains Mono','Courier New',monospace" },
   header: { padding:"16px 20px", borderBottom:"1px solid rgba(56,189,248,0.08)", display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:10 },
@@ -127,13 +185,54 @@ const S = {
   tab: (on) => ({ padding:"6px 12px", border:"none", borderRadius:6, cursor:"pointer", background:on?"rgba(56,189,248,0.12)":"transparent", color:on?"#38bdf8":"#4a5568", fontFamily:"inherit", fontSize:12, transition:"all 0.15s" }),
   btn: { padding:"5px 12px", borderRadius:6, border:"1px solid rgba(56,189,248,0.25)", background:"rgba(56,189,248,0.08)", color:"#38bdf8", cursor:"pointer", fontFamily:"inherit", fontSize:11, transition:"all 0.15s" },
   btnG: { padding:"5px 12px", borderRadius:6, border:"1px solid rgba(34,197,94,0.25)", background:"rgba(34,197,94,0.08)", color:"#22c55e", cursor:"pointer", fontFamily:"inherit", fontSize:11, transition:"all 0.15s" },
+  btnDanger: { padding:"5px 12px", borderRadius:6, border:"1px solid rgba(239,68,68,0.25)", background:"rgba(239,68,68,0.08)", color:"#ef4444", cursor:"pointer", fontFamily:"inherit", fontSize:11, transition:"all 0.15s" },
+  btnSave: { padding:"5px 14px", borderRadius:6, border:"1px solid rgba(56,189,248,0.35)", background:"rgba(56,189,248,0.12)", color:"#38bdf8", cursor:"pointer", fontFamily:"inherit", fontSize:11, transition:"all 0.15s", fontWeight:600 },
   pill: (c) => ({ display:"inline-block", padding:"2px 8px", borderRadius:12, fontSize:10, fontWeight:600, background:`${c}18`, color:c }),
-  taskRow: { display:"flex", alignItems:"center", gap:10, padding:"7px 10px", borderRadius:6, cursor:"pointer", borderBottom:"1px solid rgba(255,255,255,0.04)", transition:"background 0.15s" },
+  taskRow: { display:"flex", alignItems:"center", gap:10, padding:"7px 10px", borderRadius:6, cursor:"pointer", borderBottom:"1px solid rgba(255,255,255,0.04)", transition:"background 0.15s", position:"relative" },
   check: (s) => ({ width:18, height:18, borderRadius:"50%", border:`2px solid ${s==="done"?"#22c55e":s==="in_progress"?"#3b82f6":"#3a4a5f"}`, background:s==="done"?"#22c55e":s==="in_progress"?"#3b82f6":"transparent", display:"flex", alignItems:"center", justifyContent:"center", fontSize:10, flexShrink:0, color:"#fff" }),
   metricCard: { textAlign:"center", background:"rgba(12,20,45,0.85)", border:"1px solid rgba(56,189,248,0.12)", borderRadius:10, padding:"14px 8px" },
   bar: { height:4, background:"rgba(255,255,255,0.08)", borderRadius:2, overflow:"hidden" },
   subtitle: { margin:"0 0 12px", fontSize:13, color:"#64748b", fontWeight:400 },
+  formRow: { display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:8 },
+  formFull: { marginBottom:8 },
+  addForm: { background:"rgba(8,12,31,0.6)", border:"1px solid rgba(56,189,248,0.1)", borderRadius:8, padding:14, marginTop:10, animation:"fadeIn 0.2s ease" },
 };
+
+// ============================================================
+// INLINE EDIT COMPONENT
+// ============================================================
+function InlineEdit({ value, onSave, style }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(value);
+  const ref = useRef(null);
+
+  useEffect(() => { setVal(value); }, [value]);
+  useEffect(() => { if (editing && ref.current) ref.current.focus(); }, [editing]);
+
+  if (editing) {
+    return (
+      <input
+        ref={ref}
+        className="inline-edit"
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onBlur={() => { setEditing(false); if (val !== value) onSave(val); }}
+        onKeyDown={e => { if (e.key === "Enter") { setEditing(false); if (val !== value) onSave(val); } if (e.key === "Escape") { setEditing(false); setVal(value); } }}
+        style={style}
+        onClick={e => e.stopPropagation()}
+      />
+    );
+  }
+  return (
+    <span
+      onDoubleClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      style={{ ...style, cursor:"text" }}
+      title="Двойной клик для редактирования"
+    >
+      {value}
+    </span>
+  );
+}
 
 // ============================================================
 // SYNC BUTTON COMPONENT
@@ -154,24 +253,214 @@ function SyncBtn({ section, onSync }) {
 }
 
 // ============================================================
+// ADD TASK FORM
+// ============================================================
+function AddTaskForm({ onAdd, onCancel, data }) {
+  const [title, setTitle] = useState("");
+  const [priority, setPriority] = useState("high");
+  const [status, setStatus] = useState("pending");
+  const [deadline, setDeadline] = useState("");
+  const [assignee, setAssignee] = useState("Капитан");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onAdd({
+      id: nextId("T", data.tasks),
+      title: title.trim(),
+      priority,
+      status,
+      deadline: deadline || undefined,
+      assignee: assignee || "Капитан"
+    });
+    setTitle(""); setPriority("high"); setStatus("pending"); setDeadline(""); setAssignee("Капитан");
+  };
+
+  return (
+    <div style={S.addForm}>
+      <form onSubmit={handleSubmit}>
+        <div style={S.formFull}>
+          <label className="form-label">Название задачи *</label>
+          <input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Введите название..." required />
+        </div>
+        <div style={S.formRow}>
+          <div>
+            <label className="form-label">Приоритет</label>
+            <select className="form-select" value={priority} onChange={e => setPriority(e.target.value)}>
+              <option value="critical">🔴 Критический</option>
+              <option value="high">🟡 Высокий</option>
+              <option value="medium">🔵 Средний</option>
+              <option value="low">🟢 Низкий</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label">Статус</label>
+            <select className="form-select" value={status} onChange={e => setStatus(e.target.value)}>
+              <option value="pending">Ожидает</option>
+              <option value="in_progress">В работе</option>
+              <option value="done">Готово</option>
+            </select>
+          </div>
+        </div>
+        <div style={S.formRow}>
+          <div>
+            <label className="form-label">Дедлайн</label>
+            <input className="form-input" type="date" value={deadline} onChange={e => setDeadline(e.target.value)} />
+          </div>
+          <div>
+            <label className="form-label">Исполнитель</label>
+            <input className="form-input" value={assignee} onChange={e => setAssignee(e.target.value)} placeholder="Капитан" />
+          </div>
+        </div>
+        <div style={{ display:"flex", gap:8, marginTop:4 }}>
+          <button type="submit" style={S.btnG}>✓ Добавить</button>
+          <button type="button" style={S.btnDanger} onClick={onCancel}>✕ Отмена</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ============================================================
+// ADD RISK FORM
+// ============================================================
+function AddRiskForm({ onAdd, onCancel, data }) {
+  const [title, setTitle] = useState("");
+  const [sev, setSev] = useState("high");
+  const [text, setText] = useState("");
+  const [strategy, setStrategy] = useState("");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+    onAdd({
+      id: nextId("R", data.risks),
+      title: title.trim().toUpperCase(),
+      sev,
+      text: text.trim(),
+      strategy: strategy.trim()
+    });
+    setTitle(""); setSev("high"); setText(""); setStrategy("");
+  };
+
+  return (
+    <div style={S.addForm}>
+      <form onSubmit={handleSubmit}>
+        <div style={S.formRow}>
+          <div>
+            <label className="form-label">Название риска *</label>
+            <input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Например: ДЕДЛАЙН" required />
+          </div>
+          <div>
+            <label className="form-label">Уровень</label>
+            <select className="form-select" value={sev} onChange={e => setSev(e.target.value)}>
+              <option value="critical">🔴 Критический</option>
+              <option value="high">🟡 Высокий</option>
+              <option value="medium">🔵 Средний</option>
+              <option value="monitoring">🟣 Мониторинг</option>
+            </select>
+          </div>
+        </div>
+        <div style={S.formFull}>
+          <label className="form-label">Суть</label>
+          <input className="form-input" value={text} onChange={e => setText(e.target.value)} placeholder="Описание риска..." />
+        </div>
+        <div style={S.formFull}>
+          <label className="form-label">Стратегия</label>
+          <input className="form-input" value={strategy} onChange={e => setStrategy(e.target.value)} placeholder="Как управлять..." />
+        </div>
+        <div style={{ display:"flex", gap:8, marginTop:4 }}>
+          <button type="submit" style={S.btnG}>✓ Добавить</button>
+          <button type="button" style={S.btnDanger} onClick={onCancel}>✕ Отмена</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ============================================================
+// ADD CONTACT FORM
+// ============================================================
+function AddContactForm({ onAdd, onCancel }) {
+  const [name, setName] = useState("");
+  const [touches, setTouches] = useState(0);
+  const [status, setStatus] = useState("");
+  const [next, setNext] = useState("");
+  const [date, setDate] = useState("");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    onAdd({
+      name: name.trim(),
+      touches: parseInt(touches, 10) || 0,
+      status: status.trim() || "📝 Новый",
+      next: next.trim(),
+      date: date.trim() || new Date().toLocaleDateString("ru-RU", { day:"2-digit", month:"2-digit" })
+    });
+    setName(""); setTouches(0); setStatus(""); setNext(""); setDate("");
+  };
+
+  return (
+    <div style={S.addForm}>
+      <form onSubmit={handleSubmit}>
+        <div style={S.formRow}>
+          <div>
+            <label className="form-label">Имя контакта *</label>
+            <input className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="Имя или организация..." required />
+          </div>
+          <div>
+            <label className="form-label">Касания</label>
+            <input className="form-input" type="number" min="0" value={touches} onChange={e => setTouches(e.target.value)} />
+          </div>
+        </div>
+        <div style={S.formRow}>
+          <div>
+            <label className="form-label">Статус</label>
+            <input className="form-input" value={status} onChange={e => setStatus(e.target.value)} placeholder="⏳ Ожидание" />
+          </div>
+          <div>
+            <label className="form-label">Дата</label>
+            <input className="form-input" value={date} onChange={e => setDate(e.target.value)} placeholder="ДД.ММ" />
+          </div>
+        </div>
+        <div style={S.formFull}>
+          <label className="form-label">Следующий шаг</label>
+          <input className="form-input" value={next} onChange={e => setNext(e.target.value)} placeholder="Что дальше..." />
+        </div>
+        <div style={{ display:"flex", gap:8, marginTop:4 }}>
+          <button type="submit" style={S.btnG}>✓ Добавить</button>
+          <button type="button" style={S.btnDanger} onClick={onCancel}>✕ Отмена</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ============================================================
 // MAIN APP
 // ============================================================
 function App() {
   const [data, setData] = useState(INIT);
   const [tab, setTab] = useState("overview");
   const [syncing, setSyncing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [globalMsg, setGlobalMsg] = useState(null);
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
   const [lastSync, setLastSync] = useState(null);
   const [dataSource, setDataSource] = useState("INIT");
+  const [unsaved, setUnsaved] = useState(false);
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [showAddRisk, setShowAddRisk] = useState(false);
+  const [showAddContact, setShowAddContact] = useState(false);
+  const [showAddTaskOverview, setShowAddTaskOverview] = useState(false);
 
   // Загрузка data.json из GitHub
   const loadFromGitHub = useCallback(async (silent) => {
     if (!silent) setSyncing(true);
     try {
       const d = await fetchDataJson();
-      // Обновляем только непустые секции
       setData(prev => ({
         ...prev,
         tasks: d.tasks && d.tasks.length ? d.tasks : prev.tasks,
@@ -183,6 +472,7 @@ function App() {
         syncLog: [...(prev.syncLog || []), { section:"all", time:new Date().toISOString(), chars:JSON.stringify(d).length }]
       }));
       setLastSync(new Date());
+      setUnsaved(false);
       setDataSource(d.exported_at ? `data.json | Экспорт: ${new Date(d.exported_at).toLocaleDateString("ru-RU")}` : "data.json");
       if (!silent) setGlobalMsg(`✅ Данные загружены | ${new Date().toLocaleTimeString("ru-RU")}`);
     } catch(e) {
@@ -197,7 +487,98 @@ function App() {
   // Автозагрузка при открытии страницы
   useEffect(() => { loadFromGitHub(true); }, [loadFromGitHub]);
 
-  const toggleTask = (id) => setData(p => ({ ...p, tasks: p.tasks.map(t => t.id === id ? { ...t, status: t.status==="done"?"pending":t.status==="pending"?"in_progress":"done" } : t) }));
+  // Mark unsaved on data changes (except syncLog)
+  const markUnsaved = () => setUnsaved(true);
+
+  const toggleTask = (id) => {
+    setData(p => ({ ...p, tasks: p.tasks.map(t => t.id === id ? { ...t, status: t.status==="done"?"pending":t.status==="pending"?"in_progress":"done" } : t) }));
+    markUnsaved();
+  };
+
+  // ADD handlers
+  const addTask = (task) => {
+    setData(p => ({ ...p, tasks: [...p.tasks, task] }));
+    markUnsaved();
+    setShowAddTask(false);
+    setShowAddTaskOverview(false);
+  };
+
+  const addRisk = (risk) => {
+    setData(p => ({ ...p, risks: [...p.risks, risk] }));
+    markUnsaved();
+    setShowAddRisk(false);
+  };
+
+  const addContact = (contact) => {
+    setData(p => ({ ...p, contacts: [...p.contacts, contact] }));
+    markUnsaved();
+    setShowAddContact(false);
+  };
+
+  // DELETE handlers
+  const deleteTask = (id) => {
+    if (!confirm(`Удалить задачу ${id}?`)) return;
+    setData(p => ({ ...p, tasks: p.tasks.filter(t => t.id !== id) }));
+    markUnsaved();
+  };
+
+  const deleteRisk = (id) => {
+    if (!confirm(`Удалить риск ${id}?`)) return;
+    setData(p => ({ ...p, risks: p.risks.filter(r => r.id !== id) }));
+    markUnsaved();
+  };
+
+  const deleteContact = (name) => {
+    if (!confirm(`Удалить контакт "${name}"?`)) return;
+    setData(p => ({ ...p, contacts: p.contacts.filter(c => c.name !== name) }));
+    markUnsaved();
+  };
+
+  // INLINE EDIT handlers
+  const updateTask = (id, field, value) => {
+    setData(p => ({ ...p, tasks: p.tasks.map(t => t.id === id ? { ...t, [field]: value } : t) }));
+    markUnsaved();
+  };
+
+  const updateRisk = (id, field, value) => {
+    setData(p => ({ ...p, risks: p.risks.map(r => r.id === id ? { ...r, [field]: value } : r) }));
+    markUnsaved();
+  };
+
+  const updateContact = (idx, field, value) => {
+    setData(p => ({ ...p, contacts: p.contacts.map((c, i) => i === idx ? { ...c, [field]: value } : c) }));
+    markUnsaved();
+  };
+
+  // SAVE TO GITHUB
+  const handleSaveToGitHub = async () => {
+    setSaving(true);
+    setGlobalMsg("💾 Сохранение на GitHub...");
+    try {
+      const payload = {
+        exported_at: new Date().toISOString(),
+        project: "Прикус Вселенной",
+        code: "ЛЮБОВЬ",
+        tasks: data.tasks,
+        risks: data.risks,
+        status: data.status,
+        contacts: data.contacts,
+        team: data.team,
+        docs: data.docs
+      };
+      const ok = await saveToGitHub(payload);
+      if (ok) {
+        setGlobalMsg("✅ Сохранено на GitHub | " + new Date().toLocaleTimeString("ru-RU"));
+        setUnsaved(false);
+      } else {
+        setGlobalMsg("❌ Ошибка сохранения на GitHub");
+      }
+    } catch (e) {
+      setGlobalMsg("❌ Ошибка: " + e.message);
+    }
+    setSaving(false);
+    setTimeout(() => setGlobalMsg(null), 5000);
+  };
 
   const exportJSON = () => {
     const json = JSON.stringify({ exported_at: new Date().toISOString(), project: "Прикус Вселенной", code: "ЛЮБОВЬ", ...data }, null, 2);
@@ -220,6 +601,7 @@ function App() {
       if (p.team) setData(d => ({ ...d, team: p.team }));
       setShowImport(false); setImportText("");
       setGlobalMsg("✅ Данные импортированы");
+      markUnsaved();
       setTimeout(() => setGlobalMsg(null), 3000);
     } catch (e) { alert("JSON ошибка: " + e.message); }
   };
@@ -251,18 +633,31 @@ function App() {
           <button onClick={() => loadFromGitHub(false)} disabled={syncing} style={{ ...S.btn, marginLeft:8, opacity:syncing?0.6:1 }}>
             <span style={{ display:"inline-block", animation:syncing?"spin 1s linear infinite":"none" }}>⟳</span> ВСЁ
           </button>
+          <button
+            onClick={handleSaveToGitHub}
+            disabled={saving}
+            className={unsaved ? "save-btn-glow" : ""}
+            style={{ ...S.btnSave, opacity:saving?0.6:1 }}
+          >
+            💾 Сохранить
+          </button>
         </div>
       </div>
 
       {/* STATUS BAR */}
-      <div style={{ padding:"4px 20px", fontSize:10, color:"#4a5568", display:"flex", justifyContent:"space-between", borderBottom:"1px solid rgba(255,255,255,0.03)" }}>
+      <div style={{ padding:"4px 20px", fontSize:10, color:"#4a5568", display:"flex", justifyContent:"space-between", alignItems:"center", borderBottom:"1px solid rgba(255,255,255,0.03)" }}>
         <span>Источник: {dataSource}</span>
-        {lastSync && <span style={{ color:"#22c55e" }}>● Синхр: {lastSync.toLocaleTimeString("ru-RU")}</span>}
+        <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+          {unsaved && (
+            <span style={{ color:"#f59e0b", animation:"pulse 2s ease-in-out infinite" }}>● Есть несохранённые изменения</span>
+          )}
+          {lastSync && <span style={{ color:"#22c55e" }}>● Синхр: {lastSync.toLocaleTimeString("ru-RU")}</span>}
+        </div>
       </div>
 
       {/* GLOBAL MSG */}
       {globalMsg && (
-        <div style={{ padding:"8px 20px", fontSize:12, color:globalMsg.startsWith("✅")||globalMsg.startsWith("📋")?"#22c55e":"#ef4444", background:globalMsg.startsWith("✅")||globalMsg.startsWith("📋")?"rgba(34,197,94,0.06)":"rgba(239,68,68,0.06)", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
+        <div style={{ padding:"8px 20px", fontSize:12, color:globalMsg.startsWith("✅")||globalMsg.startsWith("📋")||globalMsg.startsWith("💾")?"#22c55e":"#ef4444", background:globalMsg.startsWith("✅")||globalMsg.startsWith("📋")||globalMsg.startsWith("💾")?"rgba(34,197,94,0.06)":"rgba(239,68,68,0.06)", borderBottom:"1px solid rgba(255,255,255,0.05)" }}>
           {globalMsg}
         </div>
       )}
@@ -292,14 +687,28 @@ function App() {
             {/* Risks + Contacts */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
               <div style={S.card}>
-                <h3 style={S.subtitle}>⚠ РИСКИ</h3>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+                  <h3 style={{ ...S.subtitle, margin:0 }}>⚠ РИСКИ</h3>
+                  <button style={S.btn} onClick={() => setShowAddRisk(!showAddRisk)}>+ Добавить</button>
+                </div>
+                {showAddRisk && <AddRiskForm onAdd={addRisk} onCancel={() => setShowAddRisk(false)} data={data} />}
                 {data.risks.map(r => (
-                  <div key={r.id} style={{ marginBottom:8, padding:"8px 10px", borderRadius:6, background:`${SEV[r.sev]}08`, borderLeft:`3px solid ${SEV[r.sev]}` }}>
+                  <div key={r.id} className="hoverable-row" style={{ marginBottom:8, padding:"8px 10px", borderRadius:6, background:`${SEV[r.sev]}08`, borderLeft:`3px solid ${SEV[r.sev]}`, position:"relative" }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                      <span style={{ fontWeight:600, fontSize:12 }}>{r.title}</span>
-                      <span style={S.pill(SEV[r.sev])}>{r.sev}</span>
+                      <span style={{ fontWeight:600, fontSize:12 }}>
+                        <InlineEdit value={r.title} onSave={v => updateRisk(r.id, "title", v)} />
+                      </span>
+                      <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                        <span style={S.pill(SEV[r.sev])}>{r.sev}</span>
+                        <button className="delete-btn" onClick={() => deleteRisk(r.id)}>×</button>
+                      </div>
                     </div>
-                    <p style={{ margin:"4px 0 0", fontSize:11, color:"#7a8599" }}>{r.text}</p>
+                    <p style={{ margin:"4px 0 0", fontSize:11, color:"#7a8599" }}>
+                      <InlineEdit value={r.text} onSave={v => updateRisk(r.id, "text", v)} style={{ fontSize:11, color:"#7a8599" }} />
+                    </p>
+                    <p style={{ margin:"2px 0 0", fontSize:10, color:"#64748b" }}>
+                      Стратегия: <InlineEdit value={r.strategy} onSave={v => updateRisk(r.id, "strategy", v)} style={{ fontSize:10, color:"#64748b" }} />
+                    </p>
                   </div>
                 ))}
                 <SyncBtn section="risks" onSync={() => loadFromGitHub(false)} />
@@ -308,12 +717,15 @@ function App() {
               <div style={S.card}>
                 <h3 style={S.subtitle}>◎ КОНТАКТЫ ({data.contacts.length}/13)</h3>
                 {data.contacts.map((c, i) => (
-                  <div key={i} style={{ marginBottom:6, padding:"6px 10px", borderRadius:6, background:"rgba(255,255,255,0.02)", display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:12 }}>
+                  <div key={i} className="hoverable-row" style={{ marginBottom:6, padding:"6px 10px", borderRadius:6, background:"rgba(255,255,255,0.02)", display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:12 }}>
                     <div>
                       <strong>{c.name}</strong>
                       <span style={{ color:"#4a5568", marginLeft:6 }}>×{c.touches}</span>
                     </div>
-                    <span style={{ fontSize:11 }}>{c.status}</span>
+                    <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                      <span style={{ fontSize:11 }}>{c.status}</span>
+                      <button className="delete-btn" onClick={() => deleteContact(c.name)}>×</button>
+                    </div>
                   </div>
                 ))}
                 <SyncBtn section="status" onSync={() => loadFromGitHub(false)} />
@@ -324,22 +736,27 @@ function App() {
             <div style={S.card}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
                 <h3 style={{ ...S.subtitle, margin:0 }}>☰ ЗАДАЧИ ({done}/{total})</h3>
-                <div style={S.bar}>
-                  <div style={{ ...S.bar, width:160, position:"relative" }}>
-                    <div style={{ height:4, borderRadius:2, width:`${(done/total)*100}%`, background:"linear-gradient(90deg,#3b82f6,#22c55e)", transition:"width 0.4s" }} />
+                <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                  <button style={S.btn} onClick={() => setShowAddTaskOverview(!showAddTaskOverview)}>+ Добавить</button>
+                  <div style={S.bar}>
+                    <div style={{ ...S.bar, width:160, position:"relative" }}>
+                      <div style={{ height:4, borderRadius:2, width:`${(done/total)*100}%`, background:"linear-gradient(90deg,#3b82f6,#22c55e)", transition:"width 0.4s" }} />
+                    </div>
                   </div>
                 </div>
               </div>
+              {showAddTaskOverview && <AddTaskForm onAdd={addTask} onCancel={() => setShowAddTaskOverview(false)} data={data} />}
               {sortedTasks.map(t => (
-                <div key={t.id} style={S.taskRow} onClick={() => toggleTask(t.id)}
+                <div key={t.id} className="hoverable-row" style={S.taskRow} onClick={() => toggleTask(t.id)}
                   onMouseOver={e => e.currentTarget.style.background = "rgba(56,189,248,0.04)"}
                   onMouseOut={e => e.currentTarget.style.background = "transparent"}>
                   <div style={S.check(t.status)}>{t.status === "done" ? "✓" : t.status === "in_progress" ? "◐" : ""}</div>
                   <span style={{ flex:1, fontSize:12, textDecoration:t.status==="done"?"line-through":"none", opacity:t.status==="done"?0.4:1 }}>
-                    {PRIO[t.priority]} {t.title}
+                    {PRIO[t.priority]} <InlineEdit value={t.title} onSave={v => updateTask(t.id, "title", v)} />
                   </span>
                   <span style={{ fontSize:10, color:"#4a5568" }}>{t.assignee}</span>
                   {t.deadline && <span style={{ fontSize:10, color:deadlineColor(t.deadline), fontWeight:600 }}>{daysTo(t.deadline)}д</span>}
+                  <button className="delete-btn" onClick={(e) => { e.stopPropagation(); deleteTask(t.id); }}>×</button>
                 </div>
               ))}
               <SyncBtn section="tasks" onSync={() => loadFromGitHub(false)} />
@@ -352,16 +769,23 @@ function App() {
           <div style={S.card}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
               <h3 style={{ ...S.subtitle, margin:0 }}>☰ ВСЕ ЗАДАЧИ ({done}/{total})</h3>
-              <div style={{ width:180, ...S.bar }}><div style={{ height:4, borderRadius:2, width:`${(done/total)*100}%`, background:"linear-gradient(90deg,#3b82f6,#22c55e)" }} /></div>
+              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                <button style={S.btn} onClick={() => setShowAddTask(!showAddTask)}>+ Добавить</button>
+                <div style={{ width:180, ...S.bar }}><div style={{ height:4, borderRadius:2, width:`${(done/total)*100}%`, background:"linear-gradient(90deg,#3b82f6,#22c55e)" }} /></div>
+              </div>
             </div>
+            {showAddTask && <AddTaskForm onAdd={addTask} onCancel={() => setShowAddTask(false)} data={data} />}
             {sortedTasks.map(t => (
-              <div key={t.id} style={S.taskRow} onClick={() => toggleTask(t.id)}
+              <div key={t.id} className="hoverable-row" style={S.taskRow} onClick={() => toggleTask(t.id)}
                 onMouseOver={e => e.currentTarget.style.background = "rgba(56,189,248,0.04)"}
                 onMouseOut={e => e.currentTarget.style.background = "transparent"}>
                 <div style={S.check(t.status)}>{t.status==="done"?"✓":t.status==="in_progress"?"◐":""}</div>
-                <span style={{ flex:1, fontSize:12, textDecoration:t.status==="done"?"line-through":"none", opacity:t.status==="done"?0.4:1 }}>{PRIO[t.priority]} {t.title}</span>
+                <span style={{ flex:1, fontSize:12, textDecoration:t.status==="done"?"line-through":"none", opacity:t.status==="done"?0.4:1 }}>
+                  {PRIO[t.priority]} <InlineEdit value={t.title} onSave={v => updateTask(t.id, "title", v)} />
+                </span>
                 <span style={{ fontSize:10, color:"#4a5568" }}>{t.assignee}</span>
                 {t.deadline && <span style={{ fontSize:10, color:deadlineColor(t.deadline), fontWeight:600 }}>{daysTo(t.deadline)}д</span>}
+                <button className="delete-btn" onClick={(e) => { e.stopPropagation(); deleteTask(t.id); }}>×</button>
               </div>
             ))}
             <SyncBtn section="tasks" onSync={() => loadFromGitHub(false)} />
@@ -371,7 +795,11 @@ function App() {
         {/* ====== CONTACTS ====== */}
         {tab === "contacts" && (
           <div style={S.card}>
-            <h3 style={S.subtitle}>◎ ДОМИНО-СТРАТЕГИЯ — {data.contacts.length} из 13</h3>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+              <h3 style={{ ...S.subtitle, margin:0 }}>◎ ДОМИНО-СТРАТЕГИЯ — {data.contacts.length} из 13</h3>
+              <button style={S.btn} onClick={() => setShowAddContact(!showAddContact)}>+ Добавить</button>
+            </div>
+            {showAddContact && <AddContactForm onAdd={addContact} onCancel={() => setShowAddContact(false)} />}
             <table style={{ width:"100%", borderCollapse:"collapse", fontSize:12 }}>
               <thead><tr style={{ borderBottom:"1px solid rgba(255,255,255,0.08)" }}>
                 <th style={{ padding:8, textAlign:"left", color:"#4a5568", fontSize:10, textTransform:"uppercase" }}>#</th>
@@ -380,21 +808,33 @@ function App() {
                 <th style={{ padding:8, textAlign:"left", color:"#4a5568", fontSize:10, textTransform:"uppercase" }}>Статус</th>
                 <th style={{ padding:8, textAlign:"left", color:"#4a5568", fontSize:10, textTransform:"uppercase" }}>Дата</th>
                 <th style={{ padding:8, textAlign:"left", color:"#4a5568", fontSize:10, textTransform:"uppercase" }}>Следующий шаг</th>
+                <th style={{ padding:8, textAlign:"center", color:"#4a5568", fontSize:10, textTransform:"uppercase", width:30 }}></th>
               </tr></thead>
               <tbody>
                 {data.contacts.map((c, i) => (
-                  <tr key={i} style={{ borderBottom:"1px solid rgba(255,255,255,0.03)" }}>
+                  <tr key={i} className="hoverable-row" style={{ borderBottom:"1px solid rgba(255,255,255,0.03)" }}>
                     <td style={{ padding:8, color:"#4a5568" }}>{i + 1}</td>
-                    <td style={{ padding:8, fontWeight:600 }}>{c.name}</td>
+                    <td style={{ padding:8, fontWeight:600 }}>
+                      <InlineEdit value={c.name} onSave={v => updateContact(i, "name", v)} />
+                    </td>
                     <td style={{ padding:8 }}><span style={S.pill("#38bdf8")}>{c.touches}</span></td>
-                    <td style={{ padding:8, fontSize:11 }}>{c.status}</td>
-                    <td style={{ padding:8, color:"#7a8599", fontSize:11 }}>{c.date}</td>
-                    <td style={{ padding:8, color:"#94a3b8", fontSize:11 }}>{c.next}</td>
+                    <td style={{ padding:8, fontSize:11 }}>
+                      <InlineEdit value={c.status} onSave={v => updateContact(i, "status", v)} style={{ fontSize:11 }} />
+                    </td>
+                    <td style={{ padding:8, color:"#7a8599", fontSize:11 }}>
+                      <InlineEdit value={c.date} onSave={v => updateContact(i, "date", v)} style={{ fontSize:11, color:"#7a8599" }} />
+                    </td>
+                    <td style={{ padding:8, color:"#94a3b8", fontSize:11 }}>
+                      <InlineEdit value={c.next} onSave={v => updateContact(i, "next", v)} style={{ fontSize:11, color:"#94a3b8" }} />
+                    </td>
+                    <td style={{ padding:8, textAlign:"center" }}>
+                      <button className="delete-btn" onClick={() => deleteContact(c.name)}>×</button>
+                    </td>
                   </tr>
                 ))}
-                {[...Array(8)].map((_, i) => (
+                {data.contacts.length < 13 && [...Array(Math.max(0, 13 - data.contacts.length))].map((_, i) => (
                   <tr key={`e${i}`} style={{ borderBottom:"1px solid rgba(255,255,255,0.02)", opacity:0.2 }}>
-                    <td style={{ padding:8 }}>{i + 6}</td><td style={{ padding:8 }}>—</td><td style={{ padding:8 }}>0</td><td style={{ padding:8 }}>—</td><td style={{ padding:8 }}>—</td><td style={{ padding:8 }}>—</td>
+                    <td style={{ padding:8 }}>{data.contacts.length + i + 1}</td><td style={{ padding:8 }}>—</td><td style={{ padding:8 }}>0</td><td style={{ padding:8 }}>—</td><td style={{ padding:8 }}>—</td><td style={{ padding:8 }}>—</td><td></td>
                   </tr>
                 ))}
               </tbody>
@@ -505,7 +945,7 @@ function App() {
 
       {/* FOOTER */}
       <div style={{ padding:"12px 20px", borderTop:"1px solid rgba(56,189,248,0.06)", textAlign:"center", color:"#2d3748", fontSize:10, marginTop:30 }}>
-        МИЦАР Dashboard v3.0 | data.json → GitHub | Прикус Вселенной | Код: ЛЮБОВЬ |{" "}
+        МИЦАР Dashboard v4.0 | data.json → GitHub | Прикус Вселенной | Код: ЛЮБОВЬ |{" "}
         <a href="https://biteoftheuniverse.com" target="_blank" rel="noopener noreferrer" style={{ color:"#38bdf8", textDecoration:"none" }}>biteoftheuniverse.com</a>
       </div>
     </div>
