@@ -370,115 +370,11 @@
   ],
   "syncLog": [
     {
-      "time": "20.03.2026, 12:58:21",
-      "source": "AutoSync v4.1",
-      "tasks": 12
-    },
-    {
-      "time": "20.03.2026, 12:50:16",
-      "source": "AutoSync v4.3",
-      "tasks": 12,
-      "captain": 10
-    },
-    {
-      "time": "20.03.2026, 12:43:21",
-      "source": "AutoSync v4.1",
-      "tasks": 12
-    },
-    {
-      "time": "20.03.2026, 12:35:08",
-      "source": "AutoSync v4.3",
-      "tasks": 12,
-      "captain": 10
-    },
-    {
-      "time": "20.03.2026, 12:28:25",
-      "source": "AutoSync v4.1",
-      "tasks": 12
-    },
-    {
-      "time": "20.03.2026, 12:20:10",
-      "source": "AutoSync v4.3",
-      "tasks": 12,
-      "captain": 10
-    },
-    {
-      "time": "20.03.2026, 12:13:21",
-      "source": "AutoSync v4.1",
-      "tasks": 12
-    },
-    {
-      "time": "20.03.2026, 12:05:10",
-      "source": "AutoSync v4.3",
-      "tasks": 12,
-      "captain": 10
-    },
-    {
-      "time": "20.03.2026, 11:58:24",
-      "source": "AutoSync v4.1",
-      "tasks": 12
-    },
-    {
-      "time": "20.03.2026, 11:50:11",
-      "source": "AutoSync v4.3",
-      "tasks": 12,
-      "captain": 10
-    },
-    {
-      "time": "20.03.2026, 11:43:21",
-      "source": "AutoSync v4.1",
-      "tasks": 12
-    },
-    {
-      "time": "20.03.2026, 11:35:13",
-      "source": "AutoSync v4.3",
-      "tasks": 12,
-      "captain": 10
-    },
-    {
-      "time": "20.03.2026, 11:28:43",
-      "source": "AutoSync v4.1",
-      "tasks": 12
-    },
-    {
-      "time": "20.03.2026, 11:20:09",
-      "source": "AutoSync v4.3",
-      "tasks": 12,
-      "captain": 10
-    },
-    {
-      "time": "20.03.2026, 11:13:21",
-      "source": "AutoSync v4.1",
-      "tasks": 12
-    },
-    {
-      "time": "20.03.2026, 11:05:09",
-      "source": "AutoSync v4.3",
-      "tasks": 12,
-      "captain": 10
-    },
-    {
-      "time": "20.03.2026, 10:58:24",
-      "source": "AutoSync v4.1",
-      "tasks": 12
-    },
-    {
-      "time": "20.03.2026, 10:50:09",
-      "source": "AutoSync v4.3",
-      "tasks": 12,
-      "captain": 10
-    },
-    {
-      "time": "20.03.2026, 10:43:23",
-      "source": "AutoSync v4.1",
-      "tasks": 12
-    },
-    {
-      "time": "20.03.2026, 10:35:11",
+      "time": "20.03.2026, 13:05:09",
       "source": "AutoSync v4.3",
       "tasks": 12,
       "captain": 10
     }
   ],
-  "exported_at": "2026-03-20T09:58:21.714Z"
+  "exported_at": "2026-03-20T10:05:09.506Z"
 }
