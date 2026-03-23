@@ -370,6 +370,11 @@
   ],
   "syncLog": [
     {
+      "time": "23.03.2026, 16:28:24",
+      "source": "AutoSync v4.1",
+      "tasks": 12
+    },
+    {
       "time": "23.03.2026, 16:20:10",
       "source": "AutoSync v4.3",
       "tasks": 12,
@@ -473,12 +478,7 @@
       "source": "AutoSync v4.3",
       "tasks": 12,
       "captain": 10
-    },
-    {
-      "time": "23.03.2026, 13:58:25",
-      "source": "AutoSync v4.1",
-      "tasks": 12
     }
   ],
-  "exported_at": "2026-03-23T13:20:10.967Z"
+  "exported_at": "2026-03-23T13:28:24.325Z"
 }
