@@ -100,7 +100,7 @@
     }
   ],
   "status": {
-    "date": "2026-03-24",
+    "date": "2026-03-25",
     "balance": 4000,
     "deficit": 26000,
     "captain": 10,
@@ -370,6 +370,12 @@
   ],
   "syncLog": [
     {
+      "time": "25.03.2026, 03:05:10",
+      "source": "AutoSync v4.3",
+      "tasks": 12,
+      "captain": 10
+    },
+    {
       "time": "25.03.2026, 02:58:21",
       "source": "AutoSync v4.1",
       "tasks": 12
@@ -472,13 +478,7 @@
       "time": "25.03.2026, 00:43:21",
       "source": "AutoSync v4.1",
       "tasks": 12
-    },
-    {
-      "time": "25.03.2026, 00:35:12",
-      "source": "AutoSync v4.3",
-      "tasks": 12,
-      "captain": 10
     }
   ],
-  "exported_at": "2026-03-24T23:58:21.176Z"
+  "exported_at": "2026-03-25T00:05:10.302Z"
 }
