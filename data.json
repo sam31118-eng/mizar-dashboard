@@ -370,44 +370,11 @@
   ],
   "syncLog": [
     {
-      "time": "26.03.2026, 16:58:24",
-      "source": "AutoSync v4.1",
-      "tasks": 12
-    },
-    {
-      "time": "26.03.2026, 16:50:11",
-      "source": "AutoSync v4.3",
-      "tasks": 12,
-      "captain": 10
-    },
-    {
-      "time": "26.03.2026, 16:43:21",
-      "source": "AutoSync v4.1",
-      "tasks": 12
-    },
-    {
-      "time": "26.03.2026, 16:35:19",
-      "source": "AutoSync v4.3",
-      "tasks": 12,
-      "captain": 10
-    },
-    {
-      "time": "26.03.2026, 16:28:21",
-      "source": "AutoSync v4.1",
-      "tasks": 12
-    },
-    {
-      "time": "26.03.2026, 16:20:13",
-      "source": "AutoSync v4.3",
-      "tasks": 12,
-      "captain": 10
-    },
-    {
-      "time": "26.03.2026, 16:05:14",
+      "time": "26.03.2026, 17:05:14",
       "source": "AutoSync v4.3",
       "tasks": 12,
       "captain": 10
     }
   ],
-  "exported_at": "2026-03-26T13:58:24.395Z"
+  "exported_at": "2026-03-26T14:05:14.524Z"
 }
